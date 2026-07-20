@@ -4,7 +4,10 @@ Generative artificial intelligence (AI) services are becoming ubiquitous and dir
 
 # Publications
 1. Praveen Rao - **Performance of Small Language Model Pretraining on FABRIC: An Empirical Study**. In Proc. of 42nd IEEE International Conference on Data Engineering Workshops (ICDEW) (LLM+Vector Data Workshop), 12 pages, Montreal, 2026. [[PDF]](https://drive.google.com/file/d/1kbX4rSGARUEfOyUM9QkJs_IEGKOHQLY6/view?usp=sharing) [[Slides]](https://drive.google.com/file/d/1Tb1TCSIDP9XdwI_GtJP_O4zhdvNRgIXc/view?usp=sharing)
-   
+
+# Abstracts
+1. Allison M. Roth, Vinaya Kumar, Praveen Rao. **Exploring California Quail Social Dynamics Using RFID Tracking**. Animal Behavior Society Annual Conference, Cincinnati, OH, July 2026.
+
 # Team
 
 ## Faculty
