@@ -1,0 +1,2 @@
+# Publications
+1. Hulayyil Alshammari and Praveen Rao. **WIP: Controller-Based Feature Engineering Approach for Machine-Generated Text Detection in Academic Writing**. In Proc. of 2026 IEEE Frontiers in Education (FIE) Conference, 5 pages, Cyprus, 2026. (to appear) [[PDF]](https://drive.google.com/file/d/1fFJzhOAL5nIp7A20bvivbkFj8q8_T3jD/view?usp=sharing)
