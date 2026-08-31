@@ -1,0 +1,1108 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2638
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fmodern\fcharset0 Courier;\f1\fmodern\fcharset0 CourierNewPSMT;\f2\fnil\fcharset0 Menlo-Regular;
+}
+{\colortbl;\red255\green255\blue255;\red203\green203\blue202;\red255\green255\blue255;\red188\green136\blue185;
+\red212\green212\blue212;\red202\green202\blue202;\red188\green135\blue185;\red212\green212\blue212;\red167\green197\blue151;
+\red71\green137\blue205;\red194\green126\blue101;\red88\green148\blue206;\red212\green213\blue154;\red141\green212\blue254;
+\red67\green192\blue160;\red114\green185\blue255;\red113\green171\blue89;}
+{\*\expandedcolortbl;;\cssrgb\c83320\c83320\c83112;\cssrgb\c100000\c100000\c100000\c0;\cssrgb\c78928\c61279\c77593;
+\cssrgb\c86465\c86464\c86248;\cssrgb\c83229\c83229\c83125;\cssrgb\c78876\c61228\c77620;\cssrgb\c86370\c86370\c86262;\cssrgb\c71008\c80807\c65805;
+\cssrgb\c33936\c61427\c84130;\cssrgb\c80778\c56830\c46925;\cssrgb\c41371\c64935\c84491;\cssrgb\c86261\c86245\c66529;\cssrgb\c61361\c86489\c99746;
+\cssrgb\c30610\c78876\c69022;\cssrgb\c51206\c77912\c100000;\cssrgb\c50939\c71716\c42215;}
+\margl1440\margr1440\vieww28600\viewh18000\viewkind0
+\deftab720
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs28 \cf2 \cb3 \expnd0\expndtw0\kerning0
+\
+\
+\pard\pardeftab720\partightenfactor0
+\cf4 import\cf2  os\cf5 ,\cf2  re\cf5 ,\cf2  math\cf5 ,\cf2  hashlib\cf5 ,\cf2  warnings\
+\cf4 from\cf2  dataclasses \cf4 import\cf2  dataclass\cf5 ,\cf2  field\
+\cf4 from\cf2  typing \cf4 import\cf2  Dict\cf5 ,\cf2  List\cf5 ,\cf2  Tuple\cf5 ,\cf2  Optional\
+\cf4 import\cf2  numpy \cf4 as\cf2  np\
+\cf4 import\cf2  pandas \cf4 as\cf2  pd\cf6 \
+\
+\cf7 from\cf6  scipy.stats \cf7 import\cf6  ttest_ind\
+\cf7 from\cf6  statsmodels.stats.multitest \cf7 import\cf6  multipletests\
+\
+\cf7 from\cf6  sklearn.model_selection \cf7 import\cf6  StratifiedKFold\
+\cf7 from\cf6  sklearn.preprocessing \cf7 import\cf6  StandardScaler\
+\cf7 from\cf6  sklearn.feature_selection \cf7 import\cf6  mutual_info_classif\
+\cf7 from\cf6  sklearn.linear_model \cf7 import\cf6  LogisticRegression\cf8 ,\cf6  LinearRegression\
+\cf7 from\cf6  sklearn.ensemble \cf7 import\cf6  RandomForestClassifier\
+\cf7 from\cf6  sklearn.metrics \cf7 import\cf6  f1_score\
+\cf7 from\cf6  sklearn.exceptions \cf7 import\cf6  ConvergenceWarning\
+\cf7 from\cf6  sklearn.feature_extraction.text \cf7 import\cf6  TfidfVectorizer\
+\cf7 from\cf6  sklearn.metrics.pairwise \cf7 import\cf6  cosine_similarity\
+\cf7 from\cf6  sklearn.decomposition \cf7 import\cf6  PCA\
+\
+\
+SEED = \cf9 42\cf6 \
+N_FOLDS = \cf9 5\cf6 \
+N_BOOT = \cf9 20\cf6 \
+TOPK_BASE = \cf9 60\cf6 \
+SUBSET_GRID = \cf8 [\cf9 15\cf8 ,\cf6  \cf9 25\cf8 ,\cf6  \cf9 40\cf8 ]\cf6 \
+CORR_THRESHOLD = \cf9 0.92\cf6 \
+VIF_THRESHOLD = \cf10 None\cf6 \
+\
+DATA_FILE = \cf11 "/content/drive/MyDrive/Colab Notebooks/dataset/abstract_from_title.csv"\cf6   \
+\
+\
+ENABLE_CHAR_TFIDF = \cf10 True\cf6 \
+ENABLE_WORD_TFIDF = \cf10 True\cf6 \
+CHAR_TFIDF_MAX_FEATS = \cf9 1200\cf6 \
+WORD_TFIDF_MAX_FEATS = \cf9 600\cf6 \
+MIN_DF = \cf9 3\cf6 \
+MAX_DF = \cf9 0.95\cf6 \
+\
+\
+ALT_EXCLUDE_PREFIXES = \cf8 [\cf11 "tfidf_char["\cf8 ,\cf6  \cf11 "tfidf_word["\cf8 ]\cf6   \
+\
+\
+ENABLE_NLTK_STOPWORDS = \cf10 True\cf6          \
+ENABLE_CUSTOM_STOPLIST = \cf10 False\cf6        \
+CUSTOM_STOPLIST_PATH = \cf11 "/content/custom_ar_stopwords.txt"\cf6 \
+\
+ENABLE_PYARABIC = \cf10 True\cf6                \
+ENABLE_CAMEL_TOOLS = \cf10 False\cf6             \
+CAMEL_ANALYZER = \cf11 "calima-msa-r13"\cf6 \
+\
+#ENABLE_WORD2VEC = \cf10 False\cf6              \
+#WORD2VEC_PATH = \cf11 "/content/aravec_cbow_300_twitter.bin"\cf6 \
+#W2V_PCA_K = \cf9 5\cf6 \
+\
+ENABLE_ARABIZI_HEURISTIC = \cf10 False\cf6      \
+ENABLE_NLTK_ISRI_STEMMER = \cf10 True\cf6        \
+\
+\pard\pardeftab720\partightenfactor0
+\cf12 def\cf6  \cf13 set_seeds\cf6 (\cf14 seed\cf6 =SEED)\cf8 :\cf6 \
+    np.random.seed\cf8 (\cf6 seed\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 sha256_of_file\cf6 (\cf14 path\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 try\cf8 :\cf6 \
+        h = hashlib.sha256\cf8 ()\cf6 \
+        \cf7 with\cf6  \cf13 open\cf8 (\cf6 path\cf8 ,\cf6  \cf11 "rb"\cf8 )\cf6  \cf7 as\cf6  f\cf8 :\cf6 \
+           \cf7 for\cf6  chunk \cf16 in\cf6  \cf13 iter\cf8 (\cf12 lambda\cf8 :\cf6  f.read\cf8 (\cf9 1\cf6 <<\cf9 20\cf8 ),\cf6  b\cf11 ""\cf8 ):\cf6 \
+              h.update\cf8 (\cf6 chunk\cf8 )\cf6 \
+        \cf7 return\cf6  h.hexdigest\cf8 ()\cf6 \
+    \cf7 except\cf6  Exception\cf8 :\cf6 \
+        \cf7 return\cf6  \cf11 "NA"\cf6 \
+\
+\cf12 def\cf6  \cf13 safe_standardize\cf6 (\cf14 X\cf6 : \cf14 np\cf6 .\cf14 ndarray\cf6 ) -> Tuple\cf8 [\cf6 np.ndarray\cf8 ,\cf6  StandardScaler\cf8 ]:\cf6 \
+    scaler = StandardScaler\cf8 ()\cf6 \
+    Xz = scaler.fit_transform\cf8 (\cf6 X\cf8 )\cf6 \
+    \cf7 return\cf6  Xz\cf8 ,\cf6  scaler\
+\
+\cf12 def\cf6  \cf13 welch_t_and_d\cf6 (\cf14 x\cf6 , \cf14 y\cf6 )\cf8 :\cf6 \
+    t\cf8 ,\cf6  p = ttest_ind\cf8 (\cf6 x\cf8 ,\cf6  y\cf8 ,\cf6  equal_var=\cf10 False\cf8 ,\cf6  nan_policy=\cf11 'omit'\cf8 )\cf6 \
+    mx\cf8 ,\cf6  my = np.nanmean\cf8 (\cf6 x\cf8 ),\cf6  np.nanmean\cf8 (\cf6 y\cf8 )\cf6 \
+    sx\cf8 ,\cf6  sy = np.nanstd\cf8 (\cf6 x\cf8 ,\cf6  ddof=\cf9 1\cf8 ),\cf6  np.nanstd\cf8 (\cf6 y\cf8 ,\cf6  ddof=\cf9 1\cf8 )\cf6 \
+    nx\cf8 ,\cf6  ny = np.\cf13 sum\cf8 (\cf6 ~np.isnan\cf8 (\cf6 x\cf8 )),\cf6  np.\cf13 sum\cf8 (\cf6 ~np.isnan\cf8 (\cf6 y\cf8 ))\cf6 \
+    sp = np.sqrt\cf8 (((\cf6 nx\cf9 -1\cf8 )\cf6 *sx**\cf9 2\cf6  + \cf8 (\cf6 ny\cf9 -1\cf8 )\cf6 *sy**\cf9 2\cf8 )\cf6  / \cf13 max\cf8 (\cf9 1\cf8 ,\cf6  \cf8 (\cf6 nx+ny\cf9 -2\cf8 )))\cf6  \cf7 if\cf6  \cf8 (\cf6 nx+ny\cf9 -2\cf8 )\cf6 >\cf9 0\cf6  \cf7 else\cf6  np.nan\
+    d = \cf8 (\cf6 mx - my\cf8 )\cf6  / sp \cf7 if\cf6  sp \cf16 and\cf6  \cf16 not\cf6  np.isnan\cf8 (\cf6 sp\cf8 )\cf6  \cf16 and\cf6  sp!=\cf9 0\cf6  \cf7 else\cf6  np.nan\
+    \cf7 return\cf6  t\cf8 ,\cf6  p\cf8 ,\cf6  d\cf8 ,\cf6  mx\cf8 ,\cf6  my\
+\
+\cf12 def\cf6  \cf13 vif_scores\cf6 (\cf14 df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 ) -> pd.Series\cf8 :\cf6 \
+    X = df.values\
+    vifs = \cf8 []\cf6 \
+    \cf7 for\cf6  i \cf16 in\cf6  \cf13 range\cf8 (\cf6 X.shape\cf8 [\cf9 1\cf8 ]):\cf6 \
+        y = X\cf8 [:,\cf6  i\cf8 ]\cf6 \
+        X_ = np.delete\cf8 (\cf6 X\cf8 ,\cf6  i\cf8 ,\cf6  axis=\cf9 1\cf8 )\cf6 \
+        reg = LinearRegression\cf8 ()\cf6 \
+        reg.fit\cf8 (\cf6 X_\cf8 ,\cf6  y\cf8 )\cf6 \
+        r2 = reg.score\cf8 (\cf6 X_\cf8 ,\cf6  y\cf8 )\cf6 \
+        vif = \cf9 1.0\cf6  / \cf13 max\cf8 (\cf9 1e-6\cf8 ,\cf6  \cf8 (\cf9 1.0\cf6  - r2\cf8 ))\cf6 \
+        vifs.append\cf8 (\cf6 vif\cf8 )\cf6 \
+    \cf7 return\cf6  pd.Series\cf8 (\cf6 vifs\cf8 ,\cf6  index=df.columns\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 drop_correlated\cf6 (\cf14 features_df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 , \cf14 feat_cols\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ], \cf14 thr\cf6 : \cf14 float\cf6 ) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    \cf7 if\cf6  thr \cf16 is\cf6  \cf10 None\cf6  \cf16 or\cf6  \cf16 not\cf6  feat_cols\cf8 :\cf6 \
+        \cf7 return\cf6  feat_cols\
+    sub = features_df\cf8 [\cf6 feat_cols\cf8 ]\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .fillna\cf8 (\cf9 0.0\cf8 )\cf6 \
+    corr = pd.DataFrame\cf8 (\cf6 np.corrcoef\cf8 (\cf6 sub.T\cf8 ),\cf6  index=feat_cols\cf8 ,\cf6  columns=feat_cols\cf8 )\cf6 \
+    keep\cf8 ,\cf6  dropped = \cf8 [],\cf6  \cf15 set\cf8 ()\cf6 \
+    \cf7 for\cf6  f \cf16 in\cf6  feat_cols\cf8 :\cf6 \
+        \cf7 if\cf6  f \cf16 in\cf6  dropped\cf8 :\cf6  \cf7 continue\cf6 \
+        keep.append\cf8 (\cf6 f\cf8 )\cf6 \
+        high = corr.index\cf8 [(\cf6 corr\cf8 [\cf6 f\cf8 ]\cf6 .\cf13 abs\cf8 ()\cf6  > thr\cf8 )\cf6  & \cf8 (\cf6 corr.index != f\cf8 )]\cf6 .tolist\cf8 ()\cf6 \
+        dropped.update\cf8 (\cf6 high\cf8 )\cf6 \
+    \cf7 return\cf6  keep\
+\
+\cf12 def\cf6  \cf13 direction\cf6 (\cf14 h_mean\cf6 , \cf14 a_mean\cf6 )\cf8 :\cf6 \
+    \cf7 if\cf6  pd.isna\cf8 (\cf6 h_mean\cf8 )\cf6  \cf16 or\cf6  pd.isna\cf8 (\cf6 a_mean\cf8 ):\cf6  \cf7 return\cf6  \cf11 ''\cf6 \
+    \cf7 if\cf6  h_mean > a_mean\cf8 :\cf6  \cf7 return\cf6  \cf11 'Higher in Human'\cf6 \
+    \cf7 if\cf6  h_mean < a_mean\cf8 :\cf6  \cf7 return\cf6  \cf11 'Higher in AI'\cf6 \
+    \cf7 return\cf6  \cf11 'Similar'\cf6 \
+\
+AR_LETTERS = r\cf11 "\\u0600-\\u06FF"\cf6 \
+AR_DIAC = r\cf11 "\\u0610-\\u061A\\u064B-\\u065F\\u0670\\u06D6-\\u06ED"\cf6 \
+AR_TATWEEL = \cf11 "\\u0640"\cf6 \
+AR_DIGITS = r\cf11 "\\u0660-\\u0669"\cf6 \
+LATIN = r\cf11 "A-Za-z"\cf6 \
+\
+_re_ar_tok = re.\cf13 compile\cf8 (\cf6 rf\cf11 "(?u)[\{AR_LETTERS\}]+"\cf8 )\cf6 \
+_re_any_tok = re.\cf13 compile\cf8 (\cf6 rf\cf11 "(?u)(?:[\{AR_LETTERS\}]+|[\{LATIN\}]+|\\d+)"\cf8 )\cf6 \
+_re_sent_split = re.\cf13 compile\cf8 (\cf6 rf\cf11 "[.!
+\f1 \uc0\u1567 
+\f0 !?\'85]+|[
+\f1 \uc0\u1563 
+\f0 ]"\cf8 )\cf6 \
+_re_diac = re.\cf13 compile\cf8 (\cf6 rf\cf11 "[\{AR_DIAC\}]"\cf8 )\cf6 \
+_re_tatweel = re.\cf13 compile\cf8 (\cf6 AR_TATWEEL\cf8 )\cf6 \
+_re_rep_runs = re.\cf13 compile\cf8 (\cf6 rf\cf11 "([\{AR_LETTERS\}])\\1\{\{2,\}\}"\cf8 )\cf6 \
+_re_latin = re.\cf13 compile\cf8 (\cf6 r\cf11 "[A-Za-z]"\cf8 )\cf6 \
+_re_ar_digit = re.\cf13 compile\cf8 (\cf6 rf\cf11 "[\{AR_DIGITS\}]"\cf8 )\cf6 \
+\
+AR_FUNCTION_WORDS = \cf8 \{\cf6 \
+    \cf11 "
+\f1 \uc0\u1608 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1579 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 \u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1571 \u1608 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1571 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1603 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1604 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1581 \u1578 \u1609 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1602 \u1583 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1602 \u1583 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1593 \u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1571 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1606 \u1605 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1584 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1584 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1584 \u1606 
+\f0 "\cf8 ,\cf6 \
+    \cf11 "
+\f1 \uc0\u1593 \u1604 \u1609 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1593 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1604 \u1609 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1605 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1579 \u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1593 \u1606 \u1583 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1602 \u1576 \u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 \u1593 \u1583 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 \u1610 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1583 \u1608 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1594 \u1610 \u1585 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1593 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1581 \u1587 \u1576 
+\f0 "\cf8 ,\cf6 \
+    \cf11 "
+\f1 \uc0\u1607 \u1584 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1584 \u1607 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1584 \u1604 \u1603 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1578 \u1604 \u1603 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1575 \u1584 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1571 \u1610 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1610 \u1601 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1605 \u1575 \u1584 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 \u1604 \u1578 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 \u1604 \u1584 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 \u1604 \u1584 \u1610 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1571 \u1610 
+\f0 "\cf8 ,\cf6 \
+    \cf11 "
+\f1 \uc0\u1604 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1610 \u1587 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1606 \u1607 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1606 \u1607 \u1575 
+\f0 "\cf6 \
+\pard\pardeftab720\partightenfactor0
+\cf8 \}\cf6 \
+AR_SUBORDINATORS = \cf8 \{\cf11 "
+\f1 \uc0\u1604 \u1571 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1581 \u1610 \u1579 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 \u1610 \u1606 \u1605 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1593 \u1606 \u1583 \u1605 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1584 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1584 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1585 \u1594 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1593 \u1604 \u1609 
+\f0  
+\f1 \uc0\u1575 \u1604 \u1585 \u1594 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1573 \u1604 \u1575 
+\f0  
+\f1 \uc0\u1571 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1581 \u1578 \u1609 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 \u1603 \u1610 
+\f0 "\cf8 \}\cf6 \
+AR_LOGICAL = \cf8 \{\cf11 "
+\f1 \uc0\u1604 \u1584 \u1604 \u1603 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1608 \u1576 \u1575 \u1604 \u1578 \u1575 \u1604 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1608 \u1605 \u1606 
+\f0  
+\f1 \uc0\u1579 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 \u1575 \u1604 \u1578 \u1575 \u1604 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1593 \u1604 \u1575 \u1608 \u1577 
+\f0  
+\f1 \uc0\u1593 \u1604 \u1609 
+\f0  
+\f1 \uc0\u1584 \u1604 \u1603 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 \u1575 \u1604 \u1573 \u1590 \u1575 \u1601 \u1577 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1606 
+\f0  
+\f1 \uc0\u1580 \u1607 \u1577 
+\f0  
+\f1 \uc0\u1571 \u1582 \u1585 \u1609 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 \u1610 
+\f0  
+\f1 \uc0\u1575 \u1604 \u1605 \u1602 \u1575 \u1576 \u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1582 \u1578 \u1575 \u1605 \u1611 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 \u1610 
+\f0  
+\f1 \uc0\u1575 \u1604 \u1582 \u1578 \u1575 \u1605 
+\f0 "\cf8 \}\cf6 \
+AR_PRON_1 = \cf8 \{\cf11 "
+\f1 \uc0\u1575 \u1606 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1606 \u1581 \u1606 
+\f0 "\cf8 \};\cf6  AR_PRON_2 = \cf8 \{\cf11 "
+\f1 \uc0\u1575 \u1606 \u1578 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 \u1606 \u1578 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 \u1606 \u1578 \u1606 
+\f0 "\cf8 \};\cf6  AR_PRON_3 = \cf8 \{\cf11 "
+\f1 \uc0\u1607 \u1608 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1610 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1606 
+\f0 "\cf8 \}\cf6 \
+AR_CLITIC_SUFFIXES = \cf8 (\cf11 "
+\f1 \uc0\u1607 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1607 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1605 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 \u1606 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1606 \u1575 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1606 \u1610 
+\f0 "\cf8 )\cf6 \
+AR_CLITIC_PREFIXES = \cf8 (\cf11 "
+\f1 \uc0\u1608 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1576 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1603 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1604 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1587 
+\f0 "\cf8 )\cf6 \
+DEF_ART = \cf11 "
+\f1 \uc0\u1575 \u1604 
+\f0 "\cf6 \
+\
+\pard\pardeftab720\partightenfactor0
+\cf12 def\cf6  \cf13 ar_strip_diac\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 return\cf6  _re_diac.sub\cf8 (\cf11 ""\cf8 ,\cf6  text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_strip_tatweel\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 return\cf6  _re_tatweel.sub\cf8 (\cf11 ""\cf8 ,\cf6  text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_normalize_simple\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  \cf13 isinstance\cf8 (\cf6 text\cf8 ,\cf6  \cf15 str\cf8 ):\cf6  text = \cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+    text = text.replace\cf8 (\cf11 "
+\f1 \uc0\u1571 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 
+\f0 "\cf8 )\cf6 .replace\cf8 (\cf11 "
+\f1 \uc0\u1573 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 
+\f0 "\cf8 )\cf6 .replace\cf8 (\cf11 "
+\f1 \uc0\u1570 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1575 
+\f0 "\cf8 )\cf6 .replace\cf8 (\cf11 "
+\f1 \uc0\u1609 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1610 
+\f0 "\cf8 )\cf6 \
+    \cf7 return\cf6  text\
+\
+\cf12 def\cf6  \cf13 arabic_aware_tokens\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    \cf7 return\cf6  _re_any_tok.findall\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 arabic_tokens_only\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    \cf7 return\cf6  _re_ar_tok.findall\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 split_sents_ar\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    parts = _re_sent_split.split\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 \
+    \cf7 return\cf6  \cf8 [\cf6 p.strip\cf8 ()\cf6  \cf7 for\cf6  p \cf16 in\cf6  parts \cf7 if\cf6  p \cf16 and\cf6  p.strip\cf8 ()]\cf6 \
+\
+\cf12 def\cf6  \cf13 safe_div\cf6 (\cf14 a\cf6 ,\cf14 b\cf6 )\cf8 :\cf6  \cf7 return\cf6  \cf15 float\cf8 (\cf6 a\cf8 )\cf6 /\cf15 float\cf8 (\cf6 b\cf8 )\cf6  \cf7 if\cf6  b \cf7 else\cf6  \cf9 0.0\cf6 \
+\
+_ar_stop = \cf15 set\cf8 ()\cf6 \
+\pard\pardeftab720\partightenfactor0
+\cf7 if\cf6  ENABLE_NLTK_STOPWORDS\cf8 :\cf6 \
+   \cf7 try\cf8 :\cf6 \
+        \cf7 import\cf6  nltk\
+        \cf7 from\cf6  nltk.corpus \cf7 import\cf6  stopwords\
+        \cf7 try\cf8 :\cf6 \
+            _ = stopwords.words\cf8 (\cf11 'arabic'\cf8 )\cf6 \
+        \cf7 except\cf6  LookupError\cf8 :\cf6 \
+            nltk.download\cf8 (\cf11 'stopwords'\cf8 )\cf6 \
+        _ar_stop = \cf15 set\cf8 (\cf6 stopwords.words\cf8 (\cf11 'arabic'\cf8 ))\cf6 \
+    \cf7 except\cf6  Exception\cf8 :\cf6 \
+        ENABLE_NLTK_STOPWORDS = \cf10 False\cf6 \
+\
+_custom_stop = \cf15 set\cf8 ()\cf6 \
+\cf7 if\cf6  ENABLE_CUSTOM_STOPLIST \cf16 and\cf6  os.path.isfile\cf8 (\cf6 CUSTOM_STOPLIST_PATH\cf8 ):\cf6 \
+    \cf7 with\cf6  \cf13 open\cf8 (\cf6 CUSTOM_STOPLIST_PATH\cf8 ,\cf6  \cf11 'r'\cf8 ,\cf6  encoding=\cf11 'utf8'\cf8 )\cf6  \cf7 as\cf6  f\cf8 :\cf6 \
+        _custom_stop = \cf8 \{\cf6 ln.strip\cf8 ()\cf6  \cf7 for\cf6  ln \cf16 in\cf6  f \cf7 if\cf6  ln.strip\cf8 ()\}\cf6 \
+\
+_araby = \cf10 None\cf6 \
+\cf7 if\cf6  ENABLE_PYARABIC\cf8 :\cf6 \
+   \cf7 try\cf8 :\cf6 \
+        \cf7 from\cf6  pyarabic \cf7 import\cf6  araby\
+        _araby = araby\
+    \cf7 except\cf6  Exception\cf8 :\cf6 \
+        _araby = \cf10 None\cf6 \
+\
+\pard\pardeftab720\partightenfactor0
+\cf12 def\cf6  \cf13 ar_strip_diac_lib\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 if\cf6  _araby \cf16 is\cf6  \cf16 not\cf6  \cf10 None\cf8 :\cf6  \cf7 return\cf6  _araby.strip_tashkeel\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+    \cf7 return\cf6  ar_strip_diac\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_normalize_simple_lib\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 if\cf6  _araby \cf16 is\cf6  \cf16 not\cf6  \cf10 None\cf8 :\cf6 \
+        t = _araby.normalize_hamza\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+        t = _araby.normalize_ligature\cf8 (\cf6 t \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+        \cf7 return\cf6  t\
+    \cf7 return\cf6  ar_normalize_simple\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )\cf6 \
+\
+_camel_an = \cf10 None\cf8 ;\cf6  _camel_dediac = \cf10 None\cf6 \
+\pard\pardeftab720\partightenfactor0
+\cf7 if\cf6  ENABLE_CAMEL_TOOLS\cf8 :\cf6 \
+   \cf7 try\cf8 :\cf6 \
+        \cf7 from\cf6  camel_tools.utils.dediac \cf7 import\cf6  dediac_ar\
+        \cf7 from\cf6  camel_tools.morphology.analyzer \cf7 import\cf6  Analyzer\
+        _camel_dediac = dediac_ar\
+        _camel_an = Analyzer.prebuilt\cf8 (\cf6 CAMEL_ANALYZER\cf8 )\cf6 \
+    \cf7 except\cf6  Exception\cf8 :\cf6 \
+        _camel_an\cf8 ,\cf6  _camel_dediac = \cf10 None\cf8 ,\cf6  \cf10 None\cf6 \
+        ENABLE_CAMEL_TOOLS = \cf10 False\cf6 \
+\
+_w2v = \cf10 None\cf6 \
+\cf7 if\cf6  ENABLE_WORD2VEC\cf8 :\cf6 \
+   \cf7 try\cf8 :\cf6 \
+        \cf7 from\cf6  gensim.models \cf7 import\cf6  KeyedVectors\
+        _w2v = KeyedVectors.load_word2vec_format\cf8 (\cf6 WORD2VEC_PATH\cf8 ,\cf6  binary=\cf10 True\cf8 )\cf6 \
+    \cf7 except\cf6  Exception\cf8 :\cf6 \
+        _w2v = \cf10 None\cf6 \
+        ENABLE_WORD2VEC = \cf10 False\cf6 \
+_isri = \cf10 None\cf6 \
+\cf7 if\cf6  ENABLE_NLTK_ISRI_STEMMER\cf8 :\cf6 \
+   \cf7 try\cf8 :\cf6 \
+        \cf7 from\cf6  nltk.stem.isri \cf7 import\cf6  ISRIStemmer\
+        _isri = ISRIStemmer\cf8 ()\cf6 \
+    \cf7 except\cf6  Exception\cf8 :\cf6 \
+        _isri = \cf10 None\cf6 \
+        ENABLE_NLTK_ISRI_STEMMER = \cf10 False\cf6 \
+\
+_ARABIZI_MAP = \cf8 \{\cf11 "2"\cf8 :\cf11 "
+\f1 \uc0\u1569 
+\f0 "\cf8 ,\cf11 "3"\cf8 :\cf11 "
+\f1 \uc0\u1593 
+\f0 "\cf8 ,\cf11 "5"\cf8 :\cf11 "
+\f1 \uc0\u1582 
+\f0 "\cf8 ,\cf11 "6"\cf8 :\cf11 "
+\f1 \uc0\u1591 
+\f0 "\cf8 ,\cf11 "7"\cf8 :\cf11 "
+\f1 \uc0\u1581 
+\f0 "\cf8 ,\cf11 "8"\cf8 :\cf11 "
+\f1 \uc0\u1602 
+\f0 "\cf8 ,\cf11 "9"\cf8 :\cf11 "
+\f1 \uc0\u1589 
+\f0 "\cf8 \}\cf6 \
+\pard\pardeftab720\partightenfactor0
+\cf12 def\cf6  \cf13 arabizi_heuristic_to_ar\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  ENABLE_ARABIZI_HEURISTIC\cf8 :\cf6  \cf7 return\cf6  text \cf16 or\cf6  \cf11 ""\cf6 \
+    \cf7 return\cf6  \cf11 ""\cf6 .join\cf8 (\cf6 _ARABIZI_MAP.get\cf8 (\cf6 ch\cf8 ,\cf6  ch\cf8 )\cf6  \cf7 for\cf6  ch \cf16 in\cf6  \cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_function_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Tuple\cf8 [\cf15 float\cf8 ,\cf15 float\cf8 ]:\cf6 \
+    toks = \cf8 [\cf6 t \cf7 for\cf6  t \cf16 in\cf6  arabic_aware_tokens\cf8 (\cf6 text\cf8 )\cf6  \cf7 if\cf6  _re_ar_tok.fullmatch\cf8 (\cf6 t\cf8 )]\cf6 \
+    total = \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf6 \
+    func = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t \cf16 in\cf6  AR_FUNCTION_WORDS \cf16 or\cf6  t \cf16 in\cf6  \cf8 \{\cf11 "
+\f1 \uc0\u1608 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 
+\f0 "\cf8 \})\cf6 \
+    content = \cf13 max\cf8 (\cf9 0\cf8 ,\cf6  \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  - func\cf8 )\cf6 \
+    \cf7 return\cf6  content/total\cf8 ,\cf6  func/total\
+\
+\cf12 def\cf6  \cf13 ar_pronoun_ratios\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Tuple\cf8 [\cf15 float\cf8 ,\cf15 float\cf8 ,\cf15 float\cf8 ]:\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 );\cf6  total = \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf6 \
+    c1 = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t \cf16 in\cf6  AR_PRON_1\cf8 )\cf6 \
+    c2 = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t \cf16 in\cf6  AR_PRON_2\cf8 )\cf6 \
+    c3 = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t \cf16 in\cf6  AR_PRON_3\cf8 )\cf6 \
+    c3 += \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t.endswith\cf8 (\cf6 AR_CLITIC_SUFFIXES\cf8 ))\cf6 \
+    \cf7 return\cf6  c1/total\cf8 ,\cf6  c2/total\cf8 ,\cf6  c3/total\
+\
+\cf12 def\cf6  \cf13 ar_puncts_per_100_tokens\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_aware_tokens\cf8 (\cf6 text\cf8 );\cf6  total = \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf6 \
+    puncts = \cf13 sum\cf8 (\cf6 text.count\cf8 (\cf6 p\cf8 )\cf6  \cf7 for\cf6  p \cf16 in\cf6  \cf8 [\cf11 "
+\f1 \uc0\u1548 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1563 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1567 
+\f0 "\cf8 ,\cf11 "!"\cf8 ,\cf11 "\'85"\cf8 ,\cf11 "."\cf8 ])\cf6 \
+    \cf7 return\cf6  \cf9 100.0\cf6  * puncts / total\
+\
+\cf12 def\cf6  \cf13 ar_connectives_count\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 int\cf8 :\cf6 \
+    t = ar_normalize_simple_lib\cf8 (\cf6 ar_strip_diac_lib\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 .replace\cf8 (\cf11 "  "\cf8 ,\cf11 " "\cf8 )\cf6 .strip\cf8 ()\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  t\cf8 :\cf6  \cf7 return\cf6  \cf9 0\cf6 \
+    two = \cf13 sum\cf8 (\cf6 t.count\cf8 (\cf6 phr\cf8 )\cf6  \cf7 for\cf6  phr \cf16 in\cf6  \cf8 [\cf11 "
+\f1 \uc0\u1593 \u1604 \u1609 
+\f0  
+\f1 \uc0\u1575 \u1604 \u1585 \u1594 \u1605 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1605 \u1606 
+\f0  
+\f1 \uc0\u1580 \u1607 \u1577 
+\f0 "\cf8 ,\cf11 "
+\f1 \uc0\u1601 \u1610 
+\f0  
+\f1 \uc0\u1575 \u1604 \u1582 \u1578 \u1575 \u1605 
+\f0 "\cf8 ])\cf6 \
+    one = \cf13 sum\cf8 (\cf6 t.count\cf8 (\cf6 w\cf8 )\cf6  \cf7 for\cf6  w \cf16 in\cf6  AR_LOGICAL \cf7 if\cf6  \cf11 " "\cf6  \cf16 not\cf6  \cf16 in\cf6  w\cf8 )\cf6 \
+    \cf7 return\cf6  \cf15 int\cf8 (\cf6 two + one\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_subordinator_per_sent\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    sents = split_sents_ar\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  sents\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    norm = ar_normalize_simple_lib\cf8 (\cf6 ar_strip_diac_lib\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 \
+    hits = \cf13 sum\cf8 (\cf6 norm.count\cf8 (\cf6 w\cf8 )\cf6  \cf7 for\cf6  w \cf16 in\cf6  AR_SUBORDINATORS\cf8 )\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf6 hits\cf8 ,\cf6  \cf13 len\cf8 (\cf6 sents\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_clitic_prefix_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    pref = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  \cf13 len\cf8 (\cf6 t\cf8 )\cf6  >= \cf9 3\cf6  \cf16 and\cf6  t.startswith\cf8 (\cf6 AR_CLITIC_PREFIXES\cf8 ))\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf6 pref\cf8 ,\cf6  \cf13 len\cf8 (\cf6 toks\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_def_article_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    pref = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  \cf13 len\cf8 (\cf6 t\cf8 )\cf6  >= \cf9 3\cf6  \cf16 and\cf6  t.startswith\cf8 (\cf6 DEF_ART\cf8 ))\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf6 pref\cf8 ,\cf6  \cf13 len\cf8 (\cf6 toks\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 ttr\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf13 len\cf8 (\cf15 set\cf8 (\cf6 toks\cf8 )),\cf6  \cf13 len\cf8 (\cf6 toks\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 hapax_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    \cf7 from\cf6  collections \cf7 import\cf6  Counter\
+    c = Counter\cf8 (\cf6 toks\cf8 )\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  w\cf8 ,\cf6 ct \cf16 in\cf6  c.items\cf8 ()\cf6  \cf7 if\cf6  ct==\cf9 1\cf8 ),\cf6  \cf13 len\cf8 (\cf6 toks\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 avg_word_len\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 return\cf6  \cf15 float\cf8 (\cf6 np.mean\cf8 ([\cf13 len\cf8 (\cf6 w\cf8 )\cf6  \cf7 for\cf6  w \cf16 in\cf6  toks\cf8 ]))\cf6  \cf7 if\cf6  toks \cf7 else\cf6  \cf9 0.0\cf6 \
+\
+\cf12 def\cf6  \cf13 word_freq_bands\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Tuple\cf8 [\cf15 float\cf8 ,\cf15 float\cf8 ]:\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf8 (\cf9 0.0\cf8 ,\cf6  \cf9 0.0\cf8 )\cf6 \
+    \cf7 from\cf6  collections \cf7 import\cf6  Counter\
+    c = Counter\cf8 (\cf6 toks\cf8 )\cf6 .most_common\cf8 ()\cf6 \
+    top10 = \cf13 sum\cf8 (\cf6 ct \cf7 for\cf6  _\cf8 ,\cf6 ct \cf16 in\cf6  c\cf8 [:\cf9 10\cf8 ]);\cf6  bot10 = \cf13 sum\cf8 (\cf6 ct \cf7 for\cf6  _\cf8 ,\cf6 ct \cf16 in\cf6  c\cf8 [\cf9 -10\cf8 :])\cf6 \
+    total = \cf13 len\cf8 (\cf6 toks\cf8 );\cf6  \cf7 return\cf6  safe_div\cf8 (\cf6 top10\cf8 ,\cf6 total\cf8 ),\cf6  safe_div\cf8 (\cf6 bot10\cf8 ,\cf6 total\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 lexical_entropy\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    \cf7 from\cf6  collections \cf7 import\cf6  Counter\
+    c = Counter\cf8 (\cf6 toks\cf8 );\cf6  total = \cf13 len\cf8 (\cf6 toks\cf8 )\cf6 \
+    \cf7 return\cf6  -\cf13 sum\cf8 ((\cf6 ct/total\cf8 )\cf6 *math.log2\cf8 (\cf6 ct/total\cf8 )\cf6  \cf7 for\cf6  ct \cf16 in\cf6  c.values\cf8 ())\cf6 \
+\
+\cf12 def\cf6  \cf13 sentence_lengths_ar\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> List\cf8 [\cf15 int\cf8 ]:\cf6 \
+    sents = split_sents_ar\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 return\cf6  \cf8 [\cf13 len\cf8 (\cf6 arabic_aware_tokens\cf8 (\cf6 s\cf8 ))\cf6  \cf7 for\cf6  s \cf16 in\cf6  sents\cf8 ]\cf6 \
+\
+\cf12 def\cf6  \cf13 sent_len_stats_ar\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Tuple\cf8 [\cf15 float\cf8 ,\cf15 float\cf8 ]:\cf6 \
+    lens = sentence_lengths_ar\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 return\cf6  \cf8 (\cf15 float\cf8 (\cf6 np.mean\cf8 (\cf6 lens\cf8 )),\cf6  \cf15 float\cf8 (\cf6 np.std\cf8 (\cf6 lens\cf8 )))\cf6  \cf7 if\cf6  lens \cf7 else\cf6  \cf8 (\cf9 0.0\cf8 ,\cf9 0.0\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 ngram_repeats\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Tuple\cf8 [\cf15 float\cf8 ,\cf15 float\cf8 ,\cf15 float\cf8 ]:\cf6 \
+    toks = arabic_aware_tokens\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf8 (\cf9 0.0\cf8 ,\cf9 0.0\cf8 ,\cf9 0.0\cf8 )\cf6 \
+    \cf7 from\cf6  collections \cf7 import\cf6  Counter\
+    \cf12 def\cf6  \cf13 avg_repeated\cf6 (\cf14 tokens\cf6 , \cf14 n\cf6 )\cf8 :\cf6 \
+        \cf7 if\cf6  \cf13 len\cf8 (\cf6 tokens\cf8 )\cf6  < n\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+        grams = \cf8 [\cf11 ' '\cf6 .join\cf8 (\cf6 tokens\cf8 [\cf6 i\cf8 :\cf6 i+n\cf8 ])\cf6  \cf7 for\cf6  i \cf16 in\cf6  \cf13 range\cf8 (\cf13 len\cf8 (\cf6 tokens\cf8 )\cf6 -n+\cf9 1\cf8 )]\cf6 \
+        c = Counter\cf8 (\cf6 grams\cf8 );\cf6  repeated = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  g\cf8 ,\cf6 ct \cf16 in\cf6  c.items\cf8 ()\cf6  \cf7 if\cf6  ct>\cf9 1\cf8 )\cf6 \
+        \cf7 return\cf6  safe_div\cf8 (\cf6 repeated\cf8 ,\cf6  \cf13 len\cf8 (\cf6 grams\cf8 ))\cf6 \
+    \cf7 return\cf6  \cf8 (\cf6 avg_repeated\cf8 (\cf6 toks\cf8 ,\cf9 1\cf8 ),\cf6  avg_repeated\cf8 (\cf6 toks\cf8 ,\cf9 2\cf8 ),\cf6  avg_repeated\cf8 (\cf6 toks\cf8 ,\cf9 3\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_diacritic_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    diac = \cf13 len\cf8 (\cf6 _re_diac.findall\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )))\cf6 \
+    toks = arabic_aware_tokens\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf6 diac\cf8 ,\cf6  \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 ar_tatweel_per_1k\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    tw = \cf13 len\cf8 (\cf6 _re_tatweel.findall\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )));\cf6  L = \cf13 max\cf8 (\cf9 1\cf8 ,\cf6  \cf13 len\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )))\cf6 \
+    \cf7 return\cf6  \cf9 1000.0\cf6  * tw / L\
+\
+\cf12 def\cf6  \cf13 ar_repeated_runs_per_1k\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    rr = \cf13 len\cf8 (\cf6 _re_rep_runs.findall\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )));\cf6  L = \cf13 max\cf8 (\cf9 1\cf8 ,\cf6  \cf13 len\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 )))\cf6 \
+    \cf7 return\cf6  \cf9 1000.0\cf6  * rr / L\
+\
+\cf12 def\cf6  \cf13 normalization_change_pct\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    base = ar_strip_tatweel\cf8 (\cf15 str\cf8 (\cf6 text \cf16 or\cf6  \cf11 ""\cf8 ))\cf6 \
+    norm = ar_normalize_simple_lib\cf8 (\cf6 ar_strip_diac_lib\cf8 (\cf6 base\cf8 ))\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  base\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    diff = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  a\cf8 ,\cf6 b \cf16 in\cf6  \cf13 zip\cf8 (\cf6 base\cf8 ,\cf6  norm\cf8 )\cf6  \cf7 if\cf6  a != b\cf8 )\cf6  + \cf13 abs\cf8 (\cf13 len\cf8 (\cf6 base\cf8 )\cf6 -\cf13 len\cf8 (\cf6 norm\cf8 ))\cf6 \
+    \cf7 return\cf6  \cf9 100.0\cf6  * diff / \cf13 len\cf8 (\cf6 base\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 code_switch_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_aware_tokens\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    latin = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  _re_latin.search\cf8 (\cf6 t\cf8 ))\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf6 latin\cf8 ,\cf6  \cf13 len\cf8 (\cf6 toks\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 arabic_digit_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> \cf15 float\cf8 :\cf6 \
+    toks = arabic_aware_tokens\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  toks\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    ad = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  _re_ar_digit.search\cf8 (\cf6 t\cf8 ))\cf6 \
+    \cf7 return\cf6  safe_div\cf8 (\cf6 ad\cf8 ,\cf6  \cf13 len\cf8 (\cf6 toks\cf8 ))\cf6 \
+\
+\cf12 def\cf6  \cf13 thematic_cohesion\cf6 (\cf14 text\cf6 )\cf8 :\cf6 \
+    sents = split_sents_ar\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf13 len\cf8 (\cf6 sents\cf8 )\cf6  < \cf9 2\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    tfidf = TfidfVectorizer\cf8 (\cf6 min_df=\cf9 1\cf8 ,\cf6  ngram_range=\cf8 (\cf9 1\cf8 ,\cf9 2\cf8 ),\cf6  token_pattern=rf\cf11 "(?u)[\{AR_LETTERS\}]+"\cf8 )\cf6 \
+    X = tfidf.fit_transform\cf8 (\cf6 sents\cf8 )\cf6 \
+    sim = cosine_similarity\cf8 (\cf6 X\cf8 )\cf6 \
+    iu = np.triu_indices_from\cf8 (\cf6 sim\cf8 ,\cf6  k=\cf9 1\cf8 )\cf6 \
+    \cf7 return\cf6  \cf15 float\cf8 (\cf6 np.mean\cf8 (\cf6 sim\cf8 [\cf6 iu\cf8 ]))\cf6  \cf7 if\cf6  iu\cf8 [\cf9 0\cf8 ]\cf6 .size \cf7 else\cf6  \cf9 0.0\cf6 \
+\
+\cf12 def\cf6  \cf13 topic_flow_consistency\cf6 (\cf14 text\cf6 )\cf8 :\cf6 \
+    sents = split_sents_ar\cf8 (\cf6 text\cf8 )\cf6 \
+    \cf7 if\cf6  \cf13 len\cf8 (\cf6 sents\cf8 )\cf6  < \cf9 2\cf8 :\cf6  \cf7 return\cf6  \cf9 0.0\cf6 \
+    tfidf = TfidfVectorizer\cf8 (\cf6 min_df=\cf9 1\cf8 ,\cf6  ngram_range=\cf8 (\cf9 1\cf8 ,\cf9 2\cf8 ),\cf6  token_pattern=rf\cf11 "(?u)[\{AR_LETTERS\}]+"\cf8 )\cf6 \
+    X = tfidf.fit_transform\cf8 (\cf6 sents\cf8 )\cf6 \
+    sims = \cf8 [\cf15 float\cf8 (\cf6 cosine_similarity\cf8 (\cf6 X\cf8 [\cf6 i\cf8 ],\cf6  X\cf8 [\cf6 i+\cf9 1\cf8 ])[\cf9 0\cf8 ,\cf9 0\cf8 ])\cf6  \cf7 for\cf6  i \cf16 in\cf6  \cf13 range\cf8 (\cf13 len\cf8 (\cf6 sents\cf8 )\cf9 -1\cf8 )]\cf6 \
+    \cf7 return\cf6  \cf15 float\cf8 (\cf6 np.mean\cf8 (\cf6 sims\cf8 ))\cf6  \cf7 if\cf6  sims \cf7 else\cf6  \cf9 0.0\cf6 \
+\
+\cf12 def\cf6  \cf13 stopword_ratio\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Tuple\cf8 [\cf15 float\cf8 ,\cf6  \cf15 float\cf8 ]:\cf6 \
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    n = \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf6 \
+    sw_nltk = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t \cf16 in\cf6  _ar_stop\cf8 )\cf6  \cf7 if\cf6  _ar_stop \cf7 else\cf6  \cf9 0\cf6 \
+    sw_custom = \cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  t \cf16 in\cf6  toks \cf7 if\cf6  t \cf16 in\cf6  _custom_stop\cf8 )\cf6  \cf7 if\cf6  _custom_stop \cf7 else\cf6  \cf9 0\cf6 \
+    \cf7 return\cf6  \cf8 (\cf6 sw_nltk / n\cf8 ,\cf6  sw_custom / n\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 camel_morph_pos_features\cf6 (\cf14 text\cf6 : \cf14 str\cf6 ) -> Dict\cf8 [\cf15 str\cf8 ,\cf6  \cf15 float\cf8 ]:\cf6 \
+    feats = \cf8 \{\}\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  ENABLE_CAMEL_TOOLS \cf16 or\cf6  _camel_an \cf16 is\cf6  \cf10 None\cf8 :\cf6 \
+        \cf7 return\cf6  feats\
+    toks = arabic_tokens_only\cf8 (\cf6 text\cf8 )\cf6 \
+    n = \cf13 len\cf8 (\cf6 toks\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf6 \
+    pos_seq = \cf8 []\cf6 \
+    enclitic = \cf9 0\cf6 \
+    \cf7 for\cf6  w \cf16 in\cf6  toks\cf8 :\cf6 \
+        analyses = _camel_an.analyze\cf8 (\cf6 w\cf8 )\cf6 \
+        \cf7 if\cf6  \cf16 not\cf6  analyses\cf8 :\cf6 \
+           \cf7 continue\cf6 \
+        a0 = analyses\cf8 [\cf9 0\cf8 ]\cf6 \
+        pos = a0.get\cf8 (\cf11 'pos'\cf8 ,\cf6  \cf11 ''\cf8 )\cf6 \
+        pos_seq.append\cf8 (\cf6 pos\cf8 [:\cf9 3\cf8 ]\cf6  \cf7 if\cf6  pos \cf7 else\cf6  \cf11 "UNK"\cf8 )\cf6 \
+        enclitic += \cf15 int\cf8 (\cf6 a0.get\cf8 (\cf11 'enc0'\cf8 ,\cf11 '0'\cf8 )\cf6  != \cf11 '0'\cf8 )\cf6 \
+\
+    \cf7 for\cf6  tag \cf16 in\cf6  \cf8 [\cf11 "N"\cf8 ,\cf11 "V"\cf8 ,\cf11 "A"\cf8 ,\cf11 "PRON"\cf8 ]:\cf6 \
+        feats\cf8 [\cf12 f\cf11 "CAMEL_POS_\cf8 \{\cf6 tag\cf8 \}\cf11 _R"\cf8 ]\cf6  = safe_div\cf8 (\cf13 sum\cf8 (\cf9 1\cf6  \cf7 for\cf6  p \cf16 in\cf6  pos_seq \cf7 if\cf6  p.startswith\cf8 (\cf6 tag\cf8 )),\cf6  \cf13 len\cf8 (\cf6 pos_seq\cf8 )\cf6  \cf16 or\cf6  \cf9 1\cf8 )\cf6 \
+\
+    \cf7 if\cf6  \cf13 len\cf8 (\cf6 pos_seq\cf8 )\cf6  >= \cf9 2\cf8 :\cf6 \
+        \cf7 from\cf6  collections \cf7 import\cf6  Counter\
+        bigrams = \cf15 list\cf8 (\cf13 zip\cf8 (\cf6 pos_seq\cf8 ,\cf6  pos_seq\cf8 [\cf9 1\cf8 :]))\cf6 \
+        c = Counter\cf8 (\cf6 bigrams\cf8 );\cf6  total = \cf13 sum\cf8 (\cf6 c.values\cf8 ())\cf6  \cf16 or\cf6  \cf9 1\cf6 \
+        p = np.array\cf8 ([\cf6 ct/total \cf7 for\cf6  ct \cf16 in\cf6  c.values\cf8 ()],\cf6  dtype=\cf15 float\cf8 )\cf6 \
+        feats\cf8 [\cf11 "CAMEL_POS_bigram_entropy"\cf8 ]\cf6  = \cf15 float\cf8 (\cf6 -np.\cf13 sum\cf8 (\cf6 p * np.log2\cf8 (\cf6 p\cf8 )))\cf6 \
+    \cf7 else\cf8 :\cf6 \
+        feats\cf8 [\cf11 "CAMEL_POS_bigram_entropy"\cf8 ]\cf6  = \cf9 0.0\cf6 \
+\
+     feats\cf8 [\cf11 "CAMEL_EncliticPron_R"\cf8 ]\cf6  = safe_div\cf8 (\cf6 enclitic\cf8 ,\cf6  n\cf8 )\cf6 \
+     \cf7 return\cf6  feats\
+\
+\cf12 def\cf6  \cf13 mean_w2v\cf6 (\cf14 tokens\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ]) -> Optional\cf8 [\cf6 np.ndarray\cf8 ]:\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  ENABLE_WORD2VEC \cf16 or\cf6  _w2v \cf16 is\cf6  \cf10 None\cf8 :\cf6 \
+        \cf7 return\cf6  \cf10 None\cf6 \
+    vecs = \cf8 [\cf6  _w2v\cf8 [\cf6 t\cf8 ]\cf6  \cf7 for\cf6  t \cf16 in\cf6  tokens \cf7 if\cf6  t \cf16 in\cf6  _w2v \cf8 ]\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  vecs\cf8 :\cf6  \cf7 return\cf6  \cf10 None\cf6 \
+    \cf7 return\cf6  np.mean\cf8 (\cf6 vecs\cf8 ,\cf6  axis=\cf9 0\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 w2v_pca_features\cf6 (\cf14 texts\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ], \cf14 k\cf6 =W2V_PCA_K, \cf14 random_state\cf6 =SEED) -> pd.DataFrame\cf8 :\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  ENABLE_WORD2VEC \cf16 or\cf6  _w2v \cf16 is\cf6  \cf10 None\cf8 :\cf6 \
+        \cf7 return\cf6  pd.DataFrame\cf8 (\cf6 index=\cf13 range\cf8 (\cf13 len\cf8 (\cf6 texts\cf8 )))\cf6 \
+    means = \cf8 []\cf6 \
+    mask = \cf8 []\cf6 \
+    \cf7 for\cf6  tx \cf16 in\cf6  texts\cf8 :\cf6 \
+        mv = mean_w2v\cf8 (\cf6 arabic_tokens_only\cf8 (\cf6 tx\cf8 ))\cf6 \
+        means.append\cf8 (\cf6 mv \cf7 if\cf6  mv \cf16 is\cf6  \cf16 not\cf6  \cf10 None\cf6  \cf7 else\cf6  \cf10 None\cf8 )\cf6 \
+        mask.append\cf8 (\cf6 mv \cf16 is\cf6  \cf16 not\cf6  \cf10 None\cf8 )\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  \cf13 any\cf8 (\cf6 mask\cf8 ):\cf6 \
+        \cf7 return\cf6  pd.DataFrame\cf8 (\cf6 index=\cf13 range\cf8 (\cf13 len\cf8 (\cf6 texts\cf8 )))\cf6 \
+    X = np.stack\cf8 ([\cf6 m \cf7 for\cf6  m \cf16 in\cf6  means \cf7 if\cf6  m \cf16 is\cf6  \cf16 not\cf6  \cf10 None\cf8 ],\cf6  axis=\cf9 0\cf8 )\cf6 \
+    pca = PCA\cf8 (\cf6 n_components=\cf13 min\cf8 (\cf6 k\cf8 ,\cf6  X.shape\cf8 [\cf9 1\cf8 ]),\cf6  whiten=\cf10 True\cf8 ,\cf6  random_state=random_state\cf8 )\cf6 .fit\cf8 (\cf6 X\cf8 )\cf6 \
+    out = np.zeros\cf8 ((\cf13 len\cf8 (\cf6 texts\cf8 ),\cf6  pca.n_components_\cf8 ))\cf6 \
+    out\cf8 [:]\cf6  = np.nan\
+    j = \cf9 0\cf6 \
+    \cf7 for\cf6  i\cf8 ,\cf6  mv \cf16 in\cf6  \cf13 enumerate\cf8 (\cf6 means\cf8 ):\cf6 \
+        \cf7 if\cf6  mv \cf16 is\cf6  \cf10 None\cf8 :\cf6  \cf7 continue\cf6 \
+        out\cf8 [\cf6 i\cf8 ,:]\cf6  = pca.transform\cf8 (\cf6 mv.reshape\cf8 (\cf9 1\cf8 ,\cf9 -1\cf8 ))\cf6 \
+        j += \cf9 1\cf6 \
+    cols = \cf8 [\cf12 f\cf11 "W2V_PC\cf8 \{\cf6 i+\cf9 1\cf8 \}\cf11 "\cf6  \cf7 for\cf6  i \cf16 in\cf6  \cf13 range\cf8 (\cf6 out.shape\cf8 [\cf9 1\cf8 ])]\cf6 \
+    \cf7 return\cf6  pd.DataFrame\cf8 (\cf6 out\cf8 ,\cf6  columns=cols\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 load_paired_abstracts\cf6 (\cf14 path\cf6 : \cf14 str\cf6 ) -> pd.DataFrame\cf8 :\cf6 \
+    df = pd.read_csv\cf8 (\cf6 path\cf8 )\cf6 \
+    rows = \cf8 []\cf6 \
+    \cf7 if\cf6  \cf11 "original_abstract"\cf6  \cf16 in\cf6  df.columns\cf8 :\cf6 \
+        h = df\cf8 [\cf11 "original_abstract"\cf8 ]\cf6 .fillna\cf8 (\cf11 ""\cf8 )\cf6 .astype\cf8 (\cf15 str\cf8 )\cf6 \
+        rows.append\cf8 (\cf6 pd.DataFrame\cf8 (\{\cf11 "text"\cf8 :\cf6  h\cf8 ,\cf6  \cf11 "Model"\cf8 :\cf6  \cf11 "Human"\cf8 ,\cf6  \cf11 "Label"\cf8 :\cf6  \cf9 0\cf8 \}))\cf6 \
+    \cf7 if\cf6  \cf11 "openai_generated_abstract"\cf6  \cf16 in\cf6  df.columns\cf8 :\cf6 \
+        a = df\cf8 [\cf11 "openai_generated_abstract"\cf8 ]\cf6 .fillna\cf8 (\cf11 ""\cf8 )\cf6 .astype\cf8 (\cf15 str\cf8 )\cf6 \
+        rows.append\cf8 (\cf6 pd.DataFrame\cf8 (\{\cf11 "text"\cf8 :\cf6  a\cf8 ,\cf6  \cf11 "Model"\cf8 :\cf6  \cf11 "AI"\cf8 ,\cf6  \cf11 "Label"\cf8 :\cf6  \cf9 1\cf8 \}))\cf6 \
+    big = pd.concat\cf8 (\cf6 rows\cf8 ,\cf6  ignore_index=\cf10 True\cf8 )\cf6 \
+    \cf7 if\cf6  ENABLE_ARABIZI_HEURISTIC\cf8 :\cf6 \
+        big\cf8 [\cf11 "text"\cf8 ]\cf6  = big\cf8 [\cf11 "text"\cf8 ]\cf6 .apply\cf8 (\cf6 arabizi_heuristic_to_ar\cf8 )\cf6 \
+    \cf7 return\cf6  big\
+\
+\cf12 def\cf6  \cf13 extract_features\cf6 (\cf14 df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 ) -> pd.DataFrame\cf8 :\cf6 \
+    out_rows = \cf8 []\cf6 \
+    \cf7 for\cf6  _\cf8 ,\cf6  row \cf16 in\cf6  df.iterrows\cf8 ():\cf6 \
+        raw_txt = row\cf8 [\cf11 "text"\cf8 ]\cf6  \cf16 or\cf6  \cf11 ""\cf6 \
+        txt = ar_normalize_simple_lib\cf8 (\cf6 raw_txt\cf8 )\cf6 \
+\
+        out = \cf8 \{\}\cf6 \
+        out\cf8 [\cf11 "TTR"\cf8 ]\cf6  = ttr\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "Hapax"\cf8 ]\cf6  = hapax_ratio\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AvgWordLen"\cf8 ]\cf6  = avg_word_len\cf8 (\cf6 txt\cf8 )\cf6 \
+        hf\cf8 ,\cf6  lf = word_freq_bands\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "HighFreqRatio"\cf8 ]\cf6  = hf\
+        out\cf8 [\cf11 "LowFreqRatio"\cf8 ]\cf6   = lf\
+        out\cf8 [\cf11 "LexEntropy"\cf8 ]\cf6  = lexical_entropy\cf8 (\cf6 txt\cf8 )\cf6 \
+\
+        c_ratio\cf8 ,\cf6  f_ratio = ar_function_ratio\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "ContentRatioAR"\cf8 ]\cf6  = c_ratio\
+        out\cf8 [\cf11 "FunctionRatioAR"\cf8 ]\cf6  = f_ratio\
+        p1\cf8 ,\cf6  p2\cf8 ,\cf6  p3 = ar_pronoun_ratios\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_Pronoun1st"\cf8 ]\cf6  = p1\
+        out\cf8 [\cf11 "AR_Pronoun2nd"\cf8 ]\cf6  = p2\
+        out\cf8 [\cf11 "AR_Pronoun3rd"\cf8 ]\cf6  = p3\
+        out\cf8 [\cf11 "AR_CliticPrefixRatio"\cf8 ]\cf6  = ar_clitic_prefix_ratio\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_DefArticleRatio"\cf8 ]\cf6  = ar_def_article_ratio\cf8 (\cf6 txt\cf8 )\cf6 \
+\
+        avgL\cf8 ,\cf6  stdL = sent_len_stats_ar\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AvgSentLen"\cf8 ]\cf6  = avgL\
+        out\cf8 [\cf11 "SentLenSTD"\cf8 ]\cf6  = stdL\
+\
+        u\cf8 ,\cf6 b\cf8 ,\cf6 tg = ngram_repeats\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "RepUni"\cf8 ]\cf6  = u\cf8 ;\cf6  out\cf8 [\cf11 "RepBi"\cf8 ]\cf6  = b\cf8 ;\cf6  out\cf8 [\cf11 "RepTri"\cf8 ]\cf6  = tg\
+        out\cf8 [\cf11 "AR_DiacriticRatio"\cf8 ]\cf6  = ar_diacritic_ratio\cf8 (\cf6 raw_txt\cf8 )\cf6    \
+        out\cf8 [\cf11 "AR_TatweelPer1k"\cf8 ]\cf6  = ar_tatweel_per_1k\cf8 (\cf6 raw_txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_RepeatRunsPer1k"\cf8 ]\cf6  = ar_repeated_runs_per_1k\cf8 (\cf6 raw_txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_PunctPer100Tok"\cf8 ]\cf6  = ar_puncts_per_100_tokens\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_Connectives"\cf8 ]\cf6  = ar_connectives_count\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_SubordinatorPerSent"\cf8 ]\cf6  = ar_subordinator_per_sent\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "ThematicCohesion"\cf8 ]\cf6  = thematic_cohesion\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "TopicFlowConsistency"\cf8 ]\cf6  = topic_flow_consistency\cf8 (\cf6 txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "IntraSentDistance"\cf8 ]\cf6  = \cf9 1.0\cf6  - out\cf8 [\cf11 "TopicFlowConsistency"\cf8 ]\cf6 \
+\
+        out\cf8 [\cf11 "AR_NormalizationChangePct"\cf8 ]\cf6  = normalization_change_pct\cf8 (\cf6 raw_txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_CodeSwitchRatio"\cf8 ]\cf6  = code_switch_ratio\cf8 (\cf6 raw_txt\cf8 )\cf6 \
+        out\cf8 [\cf11 "AR_ArabicDigitRatio"\cf8 ]\cf6  = arabic_digit_ratio\cf8 (\cf6 raw_txt\cf8 )\cf6 \
+\
+        \cf7 if\cf6  ENABLE_NLTK_STOPWORDS \cf16 or\cf6  ENABLE_CUSTOM_STOPLIST\cf8 :\cf6 \
+            sw_nltk_r\cf8 ,\cf6  sw_custom_r = stopword_ratio\cf8 (\cf6 txt\cf8 )\cf6 \
+            out\cf8 [\cf11 "StopwordRatio_NLTK"\cf8 ]\cf6  = sw_nltk_r\
+            out\cf8 [\cf11 "StopwordRatio_Custom"\cf8 ]\cf6  = sw_custom_r\
+\
+        \cf7 if\cf6  ENABLE_CAMEL_TOOLS\cf8 :\cf6 \
+            cam = camel_morph_pos_features\cf8 (\cf6 txt\cf8 )\cf6 \
+            out.update\cf8 (\cf6 cam\cf8 )\cf6 \
+\
+        \cf7 if\cf6  ENABLE_NLTK_ISRI_STEMMER \cf16 and\cf6  _isri \cf16 is\cf6  \cf16 not\cf6  \cf10 None\cf8 :\cf6 \
+            tokens = arabic_tokens_only\cf8 (\cf6 txt\cf8 )\cf6 \
+            stems = \cf8 [\cf6  _isri.stem\cf8 (\cf6 t\cf8 )\cf6  \cf7 for\cf6  t \cf16 in\cf6  tokens \cf8 ]\cf6  \cf7 if\cf6  tokens \cf7 else\cf6  \cf8 []\cf6 \
+            stem_ttr = safe_div\cf8 (\cf13 len\cf8 (\cf15 set\cf8 (\cf6 stems\cf8 )),\cf6  \cf13 len\cf8 (\cf6 stems\cf8 ))\cf6  \cf7 if\cf6  stems \cf7 else\cf6  \cf9 0.0\cf6 \
+            out\cf8 [\cf11 "StemTTR_ISRI"\cf8 ]\cf6  = stem_ttr\
+            out\cf8 [\cf11 "DeltaTTR_TokenMinusStem"\cf8 ]\cf6  = out\cf8 [\cf11 "TTR"\cf8 ]\cf6  - stem_ttr\
+\
+        out_rows.append\cf8 (\cf6 out\cf8 )\cf6 \
+\
+   \cf7 return\cf6  pd.DataFrame\cf8 (\cf6 out_rows\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 _pretty_label\cf6 (\cf14 s\cf6 : \cf14 str\cf6 ) -> \cf15 str\cf8 :\cf6 \
+    \cf11 """Make whitespace visible for readability in column names."""\cf6 \
+    \cf7 return\cf6  s.replace\cf8 (\cf11 "\\n"\cf8 ,\cf11 "
+\f2 \uc0\u9166 
+\f0 "\cf8 )\cf6 .replace\cf8 (\cf11 "\\t"\cf8 ,\cf11 "
+\f2 \uc0\u8677 
+\f0 "\cf8 )\cf6 .replace\cf8 (\cf11 " "\cf8 ,\cf11 "
+\f2 \uc0\u9251 
+\f0 "\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 build_vector_features\cf6 (\cf14 texts\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ]) -> pd.DataFrame\cf8 :\cf6 \
+\
+    vec_parts = \cf8 []\cf6 \
+\
+    \cf7 if\cf6  ENABLE_CHAR_TFIDF\cf8 :\cf6 \
+        char_vec = TfidfVectorizer\cf8 (\cf6 \
+            analyzer=\cf11 'char'\cf8 ,\cf6  ngram_range=\cf8 (\cf9 3\cf8 ,\cf9 5\cf8 ),\cf6 \
+            min_df=MIN_DF\cf8 ,\cf6  max_df=MAX_DF\cf8 ,\cf6  lowercase=\cf10 False\cf8 ,\cf6 \
+            max_features=CHAR_TFIDF_MAX_FEATS\
+        \cf8 )\cf6 \
+        Xc = char_vec.fit_transform\cf8 (\cf6 texts\cf8 )\cf6 \
+        feats = char_vec.get_feature_names_out\cf8 ()\cf6 \
+        cols = \cf8 [\cf12 f\cf11 "tfidf_char[\cf8 \{\cf6 _pretty_label\cf8 (\cf6 g\cf8 )\}\cf11 ]"\cf6  \cf7 for\cf6  g \cf16 in\cf6  feats\cf8 ]\cf6 \
+        vec_parts.append\cf8 (\cf6 pd.DataFrame\cf8 (\cf6 Xc.toarray\cf8 (),\cf6  columns=cols\cf8 ,\cf6  dtype=\cf15 float\cf8 ))\cf6 \
+\
+    \cf7 if\cf6  ENABLE_WORD_TFIDF\cf8 :\cf6 \
+        word_vec = TfidfVectorizer\cf8 (\cf6 \
+            analyzer=\cf11 'word'\cf8 ,\cf6  ngram_range=\cf8 (\cf9 1\cf8 ,\cf9 2\cf8 ),\cf6 \
+            token_pattern=rf\cf11 "(?u)(?:[\{AR_LETTERS\}]+|[\{LATIN\}]+)"\cf8 ,\cf6 \
+            min_df=MIN_DF\cf8 ,\cf6  max_df=MAX_DF\cf8 ,\cf6  lowercase=\cf10 False\cf8 ,\cf6 \
+            max_features=WORD_TFIDF_MAX_FEATS\
+        \cf8 )\cf6 \
+        Xw = word_vec.fit_transform\cf8 (\cf6 texts\cf8 )\cf6 \
+        feats = word_vec.get_feature_names_out\cf8 ()\cf6   \cf17 # e.g., "
+\f1 \uc0\u1601 \u1610 
+\f0 ", "
+\f1 \uc0\u1601 \u1610 
+\f0  
+\f1 \uc0\u1607 \u1584 \u1575 
+\f0 "\cf6 \
+        cols = \cf8 [\cf12 f\cf11 "tfidf_word[\cf8 \{\cf6 _pretty_label\cf8 (\cf6 w\cf8 )\}\cf11 ]"\cf6  \cf7 for\cf6  w \cf16 in\cf6  feats\cf8 ]\cf6 \
+        vec_parts.append\cf8 (\cf6 pd.DataFrame\cf8 (\cf6 Xw.toarray\cf8 (),\cf6  columns=cols\cf8 ,\cf6  dtype=\cf15 float\cf8 ))\cf6 \
+\
+    \cf7 return\cf6  pd.concat\cf8 (\cf6 vec_parts\cf8 ,\cf6  axis=\cf9 1\cf8 )\cf6  \cf7 if\cf6  vec_parts \cf7 else\cf6  pd.DataFrame\cf8 (\cf6 index=\cf13 range\cf8 (\cf13 len\cf8 (\cf6 texts\cf8 )))\cf6 \
+\
+\cf12 def\cf6  \cf13 compute_stats\cf6 (\cf14 features_df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 ) -> pd.DataFrame\cf8 :\cf6 \
+    feat_cols = \cf8 [\cf6 c \cf7 for\cf6  c \cf16 in\cf6  features_df.columns \cf7 if\cf6  c \cf16 not\cf6  \cf16 in\cf6  \cf8 (\cf11 "Model"\cf8 ,\cf11 "Label"\cf8 )]\cf6 \
+    human = features_df\cf8 [\cf11 "Label"\cf8 ]\cf6  == \cf9 0\cf6 \
+    ai = features_df\cf8 [\cf11 "Label"\cf8 ]\cf6  == \cf9 1\cf6 \
+    stats_rows = \cf8 []\cf6 \
+    \cf7 for\cf6  col \cf16 in\cf6  feat_cols\cf8 :\cf6 \
+        x = features_df.loc\cf8 [\cf6 human\cf8 ,\cf6  col\cf8 ]\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .values\
+        y = features_df.loc\cf8 [\cf6 ai\cf8 ,\cf6  col\cf8 ]\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .values\
+        \cf7 try\cf8 :\cf6 \
+            t\cf8 ,\cf6  p\cf8 ,\cf6  d\cf8 ,\cf6  mx\cf8 ,\cf6  my = welch_t_and_d\cf8 (\cf6 x\cf8 ,\cf6  y\cf8 )\cf6 \
+        \cf7 except\cf6  Exception\cf8 :\cf6 \
+            t\cf8 ,\cf6  p\cf8 ,\cf6  d\cf8 ,\cf6  mx\cf8 ,\cf6  my = np.nan\cf8 ,\cf6  np.nan\cf8 ,\cf6  np.nan\cf8 ,\cf6  np.nan\cf8 ,\cf6  np.nan\
+        stats_rows.append\cf8 (\{\cf6 \
+            \cf11 "Feature"\cf8 :\cf6  col\cf8 ,\cf6  \cf11 "HumanMean"\cf8 :\cf6  mx\cf8 ,\cf6  \cf11 "AIMean"\cf8 :\cf6  my\cf8 ,\cf6 \
+            \cf11 "MeanDiff"\cf8 :\cf6  \cf8 (\cf6 mx - my\cf8 )\cf6  \cf7 if\cf6  \cf8 (\cf16 not\cf6  np.isnan\cf8 (\cf6 mx\cf8 )\cf6  \cf16 and\cf6  \cf16 not\cf6  np.isnan\cf8 (\cf6 my\cf8 ))\cf6  \cf7 else\cf6  np.nan\cf8 ,\cf6 \
+            \cf11 "Cohens_d"\cf8 :\cf6  d\cf8 ,\cf6  \cf11 "t_stat"\cf8 :\cf6  t\cf8 ,\cf6  \cf11 "p_value"\cf8 :\cf6  p\
+\
+       \cf8 \})\cf6 \
+    ############\
+    reject\cf8 ,\cf6  p_adj\cf8 ,\cf6  _\cf8 ,\cf6  _ = multipletests\cf8 (\cf6 stats_df\cf8 [\cf11 'p_value'\cf8 ]\cf6 .values\cf8 ,\cf6  method=\cf11 'fdr_bh'\cf8 )\cf6 \
+    stats_df\cf8 [\cf11 'p_adj'\cf8 ]\cf6  = p_adj\
+    stats_df\cf8 [\cf11 'Significant_FDR'\cf8 ]\cf6  = reject\
+    stats_df\cf8 [\cf11 "Direction"\cf8 ]\cf6  = stats_df.apply\cf8 (\cf12 lambda\cf6  r\cf8 :\cf6  direction\cf8 (\cf6 r\cf8 [\cf11 "HumanMean"\cf8 ],\cf6  r\cf8 [\cf11 "AIMean"\cf8 ]),\cf6  axis=\cf9 1\cf8 )\cf6 \
+    \cf7 return\cf6  stats_df.sort_values\cf8 ([\cf11 "p_adj"\cf8 ,\cf11 "Cohens_d"\cf8 ],\cf6  ascending=\cf8 [\cf10 True\cf8 ,\cf6  \cf10 False\cf8 ])\cf6 \
+\
+\cf12 def\cf6  \cf13 compute_importances\cf6 (\cf14 features_df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 ) -> pd.DataFrame\cf8 :\cf6 \
+    feat_cols = \cf8 [\cf6 c \cf7 for\cf6  c \cf16 in\cf6  features_df.columns \cf7 if\cf6  c \cf16 not\cf6  \cf16 in\cf6  \cf8 (\cf11 "Model"\cf8 ,\cf11 "Label"\cf8 )]\cf6 \
+    X = features_df\cf8 [\cf6 feat_cols\cf8 ]\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .fillna\cf8 (\cf9 0.0\cf8 )\cf6 .values\
+    y = features_df\cf8 [\cf11 "Label"\cf8 ]\cf6 .values\
+    Xz\cf8 ,\cf6  _ = safe_standardize\cf8 (\cf6 X\cf8 )\cf6 \
+\
+    \cf7 with\cf6  warnings.catch_warnings\cf8 ():\cf6 \
+        warnings.filterwarnings\cf8 (\cf11 "ignore"\cf8 ,\cf6  category=ConvergenceWarning\cf8 )\cf6 \
+        logreg = LogisticRegression\cf8 (\cf6 penalty=\cf11 'l1'\cf8 ,\cf6  solver=\cf11 'liblinear'\cf8 ,\cf6  random_state=SEED\cf8 ,\cf6  max_iter=\cf9 3000\cf8 )\cf6 .fit\cf8 (\cf6 Xz\cf8 ,\cf6  y\cf8 )\cf6 \
+    lr_importance = np.\cf13 abs\cf8 (\cf6 logreg.coef_\cf8 [\cf9 0\cf8 ])\cf6 \
+\
+    rf = RandomForestClassifier\cf8 (\cf6 n_estimators=\cf9 500\cf8 ,\cf6  random_state=SEED\cf8 ,\cf6  n_jobs=\cf9 -1\cf8 )\cf6 .fit\cf8 (\cf6 X\cf8 ,\cf6  y\cf8 )\cf6 \
+    rf_importance = rf.feature_importances_\
+\
+    mi = mutual_info_classif\cf8 (\cf6 X\cf8 ,\cf6  y\cf8 ,\cf6  random_state=SEED\cf8 ,\cf6  n_neighbors=\cf9 3\cf8 )\cf6 \
+\
+    imp = pd.DataFrame\cf8 (\{\cf6 \
+        \cf11 "Feature"\cf8 :\cf6  feat_cols\cf8 ,\cf6  \cf11 "LR_abs_coef"\cf8 :\cf6  lr_importance\cf8 ,\cf6 \
+        \cf11 "RF_importance"\cf8 :\cf6  rf_importance\cf8 ,\cf6  \cf11 "MI"\cf8 :\cf6  mi\
+    \cf8 \})\cf6 \
+    imp\cf8 [\cf11 "LR_rank"\cf8 ]\cf6  = imp\cf8 [\cf11 "LR_abs_coef"\cf8 ]\cf6 .rank\cf8 (\cf6 ascending=\cf10 False\cf8 ,\cf6  method=\cf11 "dense"\cf8 )\cf6 \
+    imp\cf8 [\cf11 "RF_rank"\cf8 ]\cf6  = imp\cf8 [\cf11 "RF_importance"\cf8 ]\cf6 .rank\cf8 (\cf6 ascending=\cf10 False\cf8 ,\cf6  method=\cf11 "dense"\cf8 )\cf6 \
+    imp\cf8 [\cf11 "MI_rank"\cf8 ]\cf6  = imp\cf8 [\cf11 "MI"\cf8 ]\cf6 .rank\cf8 (\cf6 ascending=\cf10 False\cf8 ,\cf6  method=\cf11 "dense"\cf8 )\cf6 \
+    imp\cf8 [\cf11 "ConsensusRank"\cf8 ]\cf6  = \cf8 (\cf6 imp\cf8 [\cf11 "LR_rank"\cf8 ]\cf6  + imp\cf8 [\cf11 "RF_rank"\cf8 ]\cf6  + imp\cf8 [\cf11 "MI_rank"\cf8 ])\cf6  / \cf9 3.0\cf6 \
+    \cf7 return\cf6  imp.sort_values\cf8 (\cf11 "ConsensusRank"\cf8 )\cf6 \
+\
+\cf12 def\cf6  \cf13 stability_selection\cf6 (\cf14 features_df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 , \cf14 base_pool\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ]) -> pd.Series\cf8 :\cf6 \
+    y = features_df\cf8 [\cf11 "Label"\cf8 ]\cf6 .values\
+    X_all = features_df\cf8 [\cf6 base_pool\cf8 ]\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .fillna\cf8 (\cf9 0.0\cf8 )\cf6 .values\
+    skf = StratifiedKFold\cf8 (\cf6 n_splits=N_FOLDS\cf8 ,\cf6  shuffle=\cf10 True\cf8 ,\cf6  random_state=SEED\cf8 )\cf6 \
+    counts = pd.Series\cf8 (\cf9 0\cf8 ,\cf6  index=base_pool\cf8 ,\cf6  dtype=\cf15 float\cf8 )\cf6 \
+    \cf7 for\cf6  fold\cf8 ,\cf6  \cf8 (\cf6 tr\cf8 ,\cf6  va\cf8 )\cf6  \cf16 in\cf6  \cf13 enumerate\cf8 (\cf6 skf.split\cf8 (\cf6 X_all\cf8 ,\cf6  y\cf8 )):\cf6 \
+        Xtr\cf8 ,\cf6  ytr = X_all\cf8 [\cf6 tr\cf8 ],\cf6  y\cf8 [\cf6 tr\cf8 ]\cf6 \
+        \cf7 for\cf6  b \cf16 in\cf6  \cf13 range\cf8 (\cf6 N_BOOT\cf8 ):\cf6 \
+        idx = np.random.choice\cf8 (\cf13 len\cf8 (\cf6 Xtr\cf8 ),\cf6  size=\cf13 len\cf8 (\cf6 Xtr\cf8 ),\cf6  replace=\cf10 True\cf8 )\cf6 \
+           Xb\cf8 ,\cf6  yb = Xtr\cf8 [\cf6 idx\cf8 ],\cf6  ytr\cf8 [\cf6 idx\cf8 ]\cf6 \
+           rf = RandomForestClassifier\cf8 (\cf6 n_estimators=\cf9 300\cf8 ,\cf6  random_state=SEED+b\cf8 ,\cf6  n_jobs=\cf9 -1\cf8 )\cf6 \
+           rf.fit\cf8 (\cf6 Xb\cf8 ,\cf6  yb\cf8 )\cf6 \
+           imp = rf.feature_importances_\
+           order = np.argsort\cf8 (\cf6 -imp\cf8 )\cf6 \
+           top = \cf15 set\cf8 ([\cf6 base_pool\cf8 [\cf6 i\cf8 ]\cf6  \cf7 for\cf6  i \cf16 in\cf6  order\cf8 [:\cf6  \cf13 max\cf8 (\cf9 10\cf8 ,\cf6  \cf13 len\cf8 (\cf6 base_pool\cf8 )\cf6 //\cf9 5\cf8 )]])\cf6 \
+           \cf7 for\cf6  f \cf16 in\cf6  top\cf8 :\cf6  counts\cf8 [\cf6 f\cf8 ]\cf6  += \cf9 1.0\cf6 \
+    counts /= \cf8 (\cf6 N_FOLDS * N_BOOT\cf8 )\cf6 \
+    \cf7 return\cf6  counts\
+\
+\cf12 def\cf6  \cf13 greedy_forward_subset\cf6 (\cf14 X\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 , \cf14 y\cf6 : \cf14 np\cf6 .\cf14 ndarray\cf6 , \cf14 candidates\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ], \cf14 target_size\cf6 : \cf14 int\cf6 ) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    selected\cf8 ,\cf6  remaining = \cf8 [],\cf6  candidates.copy\cf8 ()\cf6 \
+    skf = StratifiedKFold\cf8 (\cf6 n_splits=N_FOLDS\cf8 ,\cf6  shuffle=\cf10 True\cf8 ,\cf6  random_state=SEED\cf8 )\cf6 \
+    \cf7 while\cf6  \cf13 len\cf8 (\cf6 selected\cf8 )\cf6  < target_size \cf16 and\cf6  remaining\cf8 :\cf6 \
+        best_feat\cf8 ,\cf6  best_score = \cf10 None\cf8 ,\cf6  \cf9 -1.0\cf6 \
+        \cf7 for\cf6  f \cf16 in\cf6  remaining\cf8 :\cf6 \
+            feats = selected + \cf8 [\cf6 f\cf8 ]\cf6 \
+            scores = \cf8 []\cf6 \
+            \cf7 for\cf6  tr\cf8 ,\cf6  va \cf16 in\cf6  skf.split\cf8 (\cf6 X\cf8 ,\cf6  y\cf8 ):\cf6 \
+            Xtr\cf8 ,\cf6  Xva = X.iloc\cf8 [\cf6 tr\cf8 ][\cf6 feats\cf8 ]\cf6 .values\cf8 ,\cf6  X.iloc\cf8 [\cf6 va\cf8 ][\cf6 feats\cf8 ]\cf6 .values\
+               ytr\cf8 ,\cf6  yva = y\cf8 [\cf6 tr\cf8 ],\cf6  y\cf8 [\cf6 va\cf8 ]\cf6 \
+               clf = LogisticRegression\cf8 (\cf6 penalty=\cf11 "l2"\cf8 ,\cf6  solver=\cf11 "liblinear"\cf8 ,\cf6  random_state=SEED\cf8 ,\cf6  max_iter=\cf9 2000\cf8 )\cf6 \
+               clf.fit\cf8 (\cf6 Xtr\cf8 ,\cf6  ytr\cf8 )\cf6 \
+               p = clf.predict\cf8 (\cf6 Xva\cf8 )\cf6 \
+               scores.append\cf8 (\cf6 f1_score\cf8 (\cf6 yva\cf8 ,\cf6  p\cf8 ))\cf6 \
+            mean_f1 = \cf15 float\cf8 (\cf6 np.mean\cf8 (\cf6 scores\cf8 ))\cf6 \
+            \cf7 if\cf6  mean_f1 > best_score\cf8 :\cf6 \
+                best_score\cf8 ,\cf6  best_feat = mean_f1\cf8 ,\cf6  f\
+        \cf7 if\cf6  best_feat \cf16 is\cf6  \cf10 None\cf8 :\cf6  \cf7 break\cf6 \
+        selected.append\cf8 (\cf6 best_feat\cf8 );\cf6  remaining.remove\cf8 (\cf6 best_feat\cf8 )\cf6 \
+    \cf7 return\cf6  selected\
+\
+\cf12 def\cf6  \cf13 feature_cols\cf6 (\cf14 df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 ) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    \cf7 return\cf6  \cf8 [\cf6 c \cf7 for\cf6  c \cf16 in\cf6  df.columns \cf7 if\cf6  c \cf16 not\cf6  \cf16 in\cf6  \cf8 (\cf11 "Model"\cf8 ,\cf11 "Label"\cf8 )]\cf6 \
+\
+\cf12 def\cf6  \cf13 exclude_by_prefixes\cf6 (\cf14 cols\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ], \cf14 prefixes\cf6 : \cf14 List\cf6 [\cf14 str\cf6 ]) -> List\cf8 [\cf15 str\cf8 ]:\cf6 \
+    \cf7 if\cf6  \cf16 not\cf6  prefixes\cf8 :\cf6  \cf7 return\cf6  cols\
+    out = \cf8 []\cf6 \
+    \cf7 for\cf6  c \cf16 in\cf6  cols\cf8 :\cf6 \
+       \cf7 if\cf6  \cf13 any\cf8 (\cf6 c.startswith\cf8 (\cf6 p\cf8 )\cf6  \cf7 for\cf6  p \cf16 in\cf6  prefixes\cf8 ):\cf6 \
+       \cf7 continue\cf6 \
+        out.append\cf8 (\cf6 c\cf8 )\cf6 \
+    \cf7 return\cf6  out\
+\
+\cf12 def\cf6  \cf13 run_full_selection_pipeline\cf6 (\cf14 full_df\cf6 : \cf14 pd\cf6 .\cf14 DataFrame\cf6 ) -> Tuple\cf8 [\cf6 List\cf8 [\cf15 str\cf8 ],\cf6  \cf15 float\cf8 ,\cf6  pd.DataFrame\cf8 ]:\cf6 \
+\
+    stats_df = compute_stats\cf8 (\cf6 full_df\cf8 )\cf6 \
+    imp_df = compute_importances\cf8 (\cf6 full_df\cf8 )\cf6 \
+\
+    sig = stats_df\cf8 [(\cf6 stats_df\cf8 [\cf11 "p_adj"\cf8 ]\cf6  < \cf9 0.05\cf8 )\cf6  & \cf8 (\cf6 stats_df\cf8 [\cf11 "Cohens_d"\cf8 ]\cf6 .\cf13 abs\cf8 ()\cf6  >= \cf9 0.2\cf8 )]\cf6 \
+    pool = \cf8 (\cf6 imp_df.merge\cf8 (\cf6 sig\cf8 [[\cf11 "Feature"\cf8 ,\cf11 "p_adj"\cf8 ,\cf11 "Cohens_d"\cf8 ,\cf11 "Direction"\cf8 ]],\cf6  on=\cf11 "Feature"\cf8 ,\cf6  how=\cf11 "inner"\cf8 )\cf6 \
+                 .sort_values\cf8 (\cf11 "ConsensusRank"\cf8 )\cf6 \
+                 .head\cf8 (\cf6 TOPK_BASE\cf8 )[\cf11 "Feature"\cf8 ]\cf6 .tolist\cf8 ())\cf6 \
+\
+    pool = drop_correlated\cf8 (\cf6 full_df\cf8 ,\cf6  pool\cf8 ,\cf6  CORR_THRESHOLD\cf8 )\cf6 \
+    \cf7 if\cf6  VIF_THRESHOLD\cf8 :\cf6 \
+    vif = vif_scores\cf8 (\cf6 full_df\cf8 [\cf6 pool\cf8 ]\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .fillna\cf8 (\cf9 0.0\cf8 ))\cf6 \
+        pool = \cf8 [\cf6 f \cf7 for\cf6  f \cf16 in\cf6  pool \cf7 if\cf6  vif\cf8 [\cf6 f\cf8 ]\cf6  <= VIF_THRESHOLD\cf8 ]\cf6 \
+\
+    stability = stability_selection\cf8 (\cf6 full_df\cf8 ,\cf6  pool\cf8 )\cf6 \
+    stable_pool = \cf8 [\cf6 f \cf7 for\cf6  f \cf16 in\cf6  pool \cf7 if\cf6  stability.get\cf8 (\cf6 f\cf8 ,\cf6  \cf9 0.0\cf8 )\cf6  >= \cf9 0.35\cf8 ]\cf6  \cf16 or\cf6  pool\
+\
+    X = full_df.drop\cf8 (\cf6 columns=\cf8 [\cf11 "Model"\cf8 ,\cf11 "Label"\cf8 ])\cf6 .astype\cf8 (\cf15 float\cf8 )\cf6 .fillna\cf8 (\cf9 0.0\cf8 )\cf6 \
+    y = full_df\cf8 [\cf11 "Label"\cf8 ]\cf6 .values\
+    subset_results\cf8 ,\cf6  chosen\cf8 ,\cf6  best_cv = \cf8 \{\},\cf6  \cf10 None\cf8 ,\cf6  \cf9 -1.0\cf6 \
+\
+    \cf7 for\cf6  k \cf16 in\cf6  SUBSET_GRID\cf8 :\cf6 \
+        cand = stable_pool\cf8 [:\cf6  \cf13 max\cf8 (\cf6 k*\cf9 2\cf8 ,\cf6  k+\cf9 10\cf8 )]\cf6 \
+        subset_k = greedy_forward_subset\cf8 (\cf6 X\cf8 [\cf6 stable_pool\cf8 ],\cf6  y\cf8 ,\cf6  cand\cf8 ,\cf6  k\cf8 )\cf6 \
+        skf = StratifiedKFold\cf8 (\cf6 n_splits=N_FOLDS\cf8 ,\cf6  shuffle=\cf10 True\cf8 ,\cf6  random_state=SEED\cf8 )\cf6 \
+        scores = \cf8 []\cf6 \
+        \cf7 for\cf6  tr\cf8 ,\cf6  va \cf16 in\cf6  skf.split\cf8 (\cf6 X\cf8 ,\cf6  y\cf8 ):\cf6 \
+        Xtr\cf8 ,\cf6  Xva = X.iloc\cf8 [\cf6 tr\cf8 ][\cf6 subset_k\cf8 ]\cf6 .values\cf8 ,\cf6  X.iloc\cf8 [\cf6 va\cf8 ][\cf6 subset_k\cf8 ]\cf6 .values\
+           ytr\cf8 ,\cf6  yva = y\cf8 [\cf6 tr\cf8 ],\cf6  y\cf8 [\cf6 va\cf8 ]\cf6 \
+           clf = LogisticRegression\cf8 (\cf6 penalty=\cf11 "l2"\cf8 ,\cf6  solver=\cf11 "liblinear"\cf8 ,\cf6  random_state=SEED\cf8 ,\cf6  max_iter=\cf9 2000\cf8 )\cf6 \
+           clf.fit\cf8 (\cf6 Xtr\cf8 ,\cf6  ytr\cf8 )\cf6 \
+           p = clf.predict\cf8 (\cf6 Xva\cf8 )\cf6 \
+           scores.append\cf8 (\cf6 f1_score\cf8 (\cf6 yva\cf8 ,\cf6  p\cf8 ))\cf6 \
+        mean_f1 = \cf15 float\cf8 (\cf6 np.mean\cf8 (\cf6 scores\cf8 ))\cf6 \
+        subset_results\cf8 [\cf15 str\cf8 (\cf6 k\cf8 )]\cf6  = \cf8 \{\cf11 "features"\cf8 :\cf6  subset_k\cf8 ,\cf6  \cf11 "cv_f1"\cf8 :\cf6  mean_f1\cf8 \}\cf6 \
+        \cf7 if\cf6  mean_f1 > best_cv\cf8 :\cf6 \
+            best_cv\cf8 ,\cf6  chosen = mean_f1\cf8 ,\cf6  subset_k\
+\
+    final = \cf8 (\cf6 imp_df.merge\cf8 (\cf6 stats_df\cf8 ,\cf6  on=\cf11 "Feature"\cf8 ,\cf6  how=\cf11 "left"\cf8 )\cf6 \
+                    .sort_values\cf8 ([\cf11 "ConsensusRank"\cf8 ,\cf11 "p_adj"\cf8 ],\cf6  ascending=\cf8 [\cf10 True\cf8 ,\cf6  \cf10 True\cf8 ]))\cf6 \
+    final\cf8 [\cf11 "Direction"\cf8 ]\cf6  = final.apply\cf8 (\cf12 lambda\cf6  r\cf8 :\cf6  direction\cf8 (\cf6 r.get\cf8 (\cf11 "HumanMean"\cf8 ,\cf6  np.nan\cf8 ),\cf6  r.get\cf8 (\cf11 "AIMean"\cf8 ,\cf6  np.nan\cf8 )),\cf6  axis=\cf9 1\cf8 )\cf6 \
+    \cf7 return\cf6  chosen \cf16 or\cf6  \cf8 [],\cf6  best_cv\cf8 ,\cf6  final\
+\
+\cf13 @dataclass\cf6 \
+\cf12 class\cf6  AgentReport\cf8 :\cf6 \
+dataset_hash\cf8 :\cf6  \cf15 str\cf6 \
+    steps\cf8 :\cf6  List\cf8 [\cf6 Dict\cf8 ]\cf6  = field\cf8 (\cf6 default_factory=\cf15 list\cf8 )\cf6 \
+    top_features\cf8 :\cf6  List\cf8 [\cf15 str\cf8 ]\cf6  = field\cf8 (\cf6 default_factory=\cf15 list\cf8 )\cf6 \
+    chosen_subset\cf8 :\cf6  List\cf8 [\cf15 str\cf8 ]\cf6  = field\cf8 (\cf6 default_factory=\cf15 list\cf8 )\cf6 \
+    cv_scores\cf8 :\cf6  Dict\cf8 [\cf15 str\cf8 ,\cf6  \cf15 float\cf8 ]\cf6  = field\cf8 (\cf6 default_factory=\cf15 dict\cf8 )\cf6 \
+\
+\cf12 class\cf6  DiscriminativeAgent\cf8 :\cf6 \
+    \cf12 def\cf6  \cf13 __init__\cf6 (\cf14 self\cf6 , \cf14 data_file\cf6 : \cf14 str\cf6 )\cf8 :\cf6 \
+        set_seeds\cf8 (\cf6 SEED\cf8 )\cf6 \
+        \cf14 self\cf6 .path = data_file\
+        \cf14 self\cf6 .report = AgentReport\cf8 (\cf6 dataset_hash=sha256_of_file\cf8 (\cf6 data_file\cf8 ))\cf6 \
+\
+    \cf12 def\cf6  \cf13 run\cf6 (\cf14 self\cf6 )\cf8 :\cf6 \
+        raw = load_paired_abstracts\cf8 (\cf14 self\cf6 .path\cf8 )\cf6 \
+        \cf7 assert\cf6  raw\cf8 [\cf11 "Label"\cf8 ]\cf6 .nunique\cf8 ()\cf6  == \cf9 2\cf8 ,\cf6  \cf11 "Need both Human (0) and AI (1)."\cf6 \
+\
+        feats = extract_features\cf8 (\cf6 raw\cf8 )\cf6 \
+\
+        w2v_df = w2v_pca_features\cf8 (\cf6 raw\cf8 [\cf11 "text"\cf8 ]\cf6 .tolist\cf8 (),\cf6  k=W2V_PCA_K\cf8 )\cf6 \
+\
+        vec_df = build_vector_features\cf8 (\cf6 raw\cf8 [\cf11 "text"\cf8 ]\cf6 .tolist\cf8 ())\cf6 \
+\
+        all_feats = pd.concat\cf8 ([\cf6 feats.reset_index\cf8 (\cf6 drop=\cf10 True\cf8 ),\cf6 \
+                              w2v_df.reset_index\cf8 (\cf6 drop=\cf10 True\cf8 ),\cf6 \
+                              vec_df.reset_index\cf8 (\cf6 drop=\cf10 True\cf8 )],\cf6  axis=\cf9 1\cf8 )\cf6 \
+        full = pd.concat\cf8 ([\cf6 all_feats\cf8 ,\cf6  raw\cf8 [[\cf11 "Model"\cf8 ,\cf11 "Label"\cf8 ]]\cf6 .reset_index\cf8 (\cf6 drop=\cf10 True\cf8 )],\cf6  axis=\cf9 1\cf8 )\cf6 \
+\
+\
+        chosen\cf8 ,\cf6  best_cv\cf8 ,\cf6  final = run_full_selection_pipeline\cf8 (\cf6 full\cf8 )\cf6 \
+\
+        cols_all = feature_cols\cf8 (\cf6 full\cf8 )\cf6 \
+        cols_alt = exclude_by_prefixes\cf8 (\cf6 cols_all\cf8 ,\cf6  ALT_EXCLUDE_PREFIXES\cf8 )\cf6 \
+        full_alt = pd.concat\cf8 ([\cf6 full\cf8 [\cf6 cols_alt\cf8 ],\cf6  full\cf8 [[\cf11 "Model"\cf8 ,\cf11 "Label"\cf8 ]]],\cf6  axis=\cf9 1\cf8 )\cf6 \
+\
+        chosen_alt\cf8 ,\cf6  best_cv_alt\cf8 ,\cf6  final_alt = run_full_selection_pipeline\cf8 (\cf6 full_alt\cf8 )\cf6 \
+\
+        \cf14 self\cf6 .report.top_features = final\cf8 [\cf11 "Feature"\cf8 ]\cf6 .head\cf8 (\cf9 30\cf8 )\cf6 .tolist\cf8 ()\cf6 \
+        \cf14 self\cf6 .report.chosen_subset = chosen \cf16 or\cf6  \cf8 []\cf6 \
+        \cf14 self\cf6 .report.cv_scores = \cf8 \{\cf11 "main_"\cf6 +k\cf8 :\cf6  v \cf7 for\cf6  k\cf8 ,\cf6  v \cf16 in\cf6  \cf8 \{\cf11 "best_cv_f1"\cf8 :\cf6  best_cv\cf8 \}\cf6 .items\cf8 ()\}\cf6 \
+        \cf14 self\cf6 .report.steps.append\cf8 (\{\cf6 \
+            \cf11 "view"\cf8 :\cf6  \cf11 "main"\cf8 ,\cf6 \
+            \cf11 "total_features"\cf8 :\cf6  \cf13 len\cf8 (\cf6 cols_all\cf8 ),\cf6 \
+            \cf11 "best_subset_size"\cf8 :\cf6  \cf13 len\cf8 (\cf6 chosen \cf16 or\cf6  \cf8 []),\cf6 \
+            \cf11 "best_cv_f1"\cf8 :\cf6  best_cv\
+        \cf8 \})\cf6 \
+\
+        alt_report = \cf8 \{\cf6 \
+            \cf11 "view"\cf8 :\cf6  \cf11 "ALT_exclude_tfidf_char"\cf8 ,\cf6 \
+            \cf11 "excluded_prefixes"\cf8 :\cf6  ALT_EXCLUDE_PREFIXES\cf8 ,\cf6 \
+            \cf11 "total_features_after_exclusion"\cf8 :\cf6  \cf13 len\cf8 (\cf6 cols_alt\cf8 ),\cf6 \
+            \cf11 "best_subset_size"\cf8 :\cf6  \cf13 len\cf8 (\cf6 chosen_alt \cf16 or\cf6  \cf8 []),\cf6 \
+            \cf11 "best_cv_f1"\cf8 :\cf6  best_cv_alt\cf8 ,\cf6 \
+            \cf11 "top_features"\cf8 :\cf6  final_alt\cf8 [\cf11 "Feature"\cf8 ]\cf6 .head\cf8 (\cf9 30\cf8 )\cf6 .tolist\cf8 (),\cf6 \
+            \cf11 "chosen_subset"\cf8 :\cf6  chosen_alt \cf16 or\cf6  \cf8 []\cf6 \
+        \cf8 \}\cf6 \
+\
+        \cf13 print\cf8 (\cf12 f\cf11 "Samples: \cf8 \{\cf13 len\cf8 (\cf6 full\cf8 )\}\cf11  \cf6 |\cf11  Features: \cf8 \{\cf13 len\cf8 (\cf6 cols_all\cf8 )\}\cf11 "\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf12 f\cf11 "[MAIN] Pool/Subset Best CV-F1: \cf8 \{\cf6 best_cv\cf9 :.3f\cf8 \}\cf11 "\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf11 "\\n[MAIN] Top 20 features by consensus + significance:"\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf6 final\cf8 [[\cf11 "Feature"\cf8 ,\cf11 "ConsensusRank"\cf8 ,\cf11 "p_adj"\cf8 ,\cf11 "Cohens_d"\cf8 ,\cf11 "Direction"\cf8 ]]\cf6 .head\cf8 (\cf9 20\cf8 )\cf6 .to_string\cf8 (\cf6 index=\cf10 False\cf8 ))\cf6 \
+\
+        \cf13 print\cf8 (\cf11 "\\n=== ALT (No Char TF-IDF) ==="\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf12 f\cf11 "Features (after exclusion): \cf8 \{\cf13 len\cf8 (\cf6 cols_alt\cf8 )\}\cf11 "\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf12 f\cf11 "[ALT] Pool/Subset Best CV-F1: \cf8 \{\cf6 best_cv_alt\cf9 :.3f\cf8 \}\cf11 "\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf11 "\\n[ALT] Top 20 features (excluding tfidf_char[...]):"\cf8 )\cf6 \
+        \cf13 print\cf8 (\cf6 final_alt\cf8 [[\cf11 "Feature"\cf8 ,\cf11 "ConsensusRank"\cf8 ,\cf11 "p_adj"\cf8 ,\cf11 "Cohens_d"\cf8 ,\cf11 "Direction"\cf8 ]]\cf6 .head\cf8 (\cf9 20\cf8 )\cf6 .to_string\cf8 (\cf6 index=\cf10 False\cf8 ))\cf6 \
+\
+\pard\pardeftab720\partightenfactor0
+\cf7 ##############if\cf6  \cf14 __name__\cf6  == \cf11 "__main__"\cf8 :\cf6 \
+    warnings.filterwarnings\cf8 (\cf11 "ignore"\cf8 ,\cf6  category=FutureWarning\cf8 )\cf6 \
+    warnings.filterwarnings\cf8 (\cf11 "ignore"\cf8 ,\cf6  category=UserWarning\cf8 )\cf6 \
+    set_seeds\cf8 (\cf6 SEED\cf8 )\cf6 \
+    agent = DiscriminativeAgent\cf8 (\cf6 DATA_FILE\cf8 )\cf6 \
+    agent.run\cf8 ()\cf6 \
+}
